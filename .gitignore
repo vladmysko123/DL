@@ -1,0 +1,6 @@
+HW1/mlruns/
+HW1/artifacts/
+*.pt
+*.joblib
+*.log
+*.pkl
