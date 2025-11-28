@@ -4,3 +4,8 @@ HW1/artifacts/
 *.joblib
 *.log
 *.pkl
+HW2/lnu-butterflies/test/
+HW2/lnu-butterflies/train/
+HW2/lnu-butterflies/val/
+HW2/lnu-butterflies/
+HW2/models/
