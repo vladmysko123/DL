@@ -9,3 +9,5 @@ HW2/lnu-butterflies/train/
 HW2/lnu-butterflies/val/
 HW2/lnu-butterflies/
 HW2/models/
+HW3/__pycache__/
+*.npy
