@@ -6,7 +6,6 @@ from facenet_pytorch import InceptionResnetV1, MTCNN
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Load pretrained models
 print("Loading FaceNet model...")
 mtcnn = MTCNN(image_size=160, margin=0, device=device)
 resnet = InceptionResnetV1(pretrained='vggface2').eval().to(device)
@@ -41,7 +40,6 @@ def main():
             print("Camera read error.")
             break
 
-        # Convert BGR → RGB
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
         embedding = get_embedding(rgb)
@@ -52,10 +50,8 @@ def main():
             conf = probs[idx]
             name = encoder.classes_[idx]
 
-            # Decide rectangle color
             color = (0, 255, 0) if conf > 0.5 else (0, 0, 255)
 
-            # Draw info
             cv2.putText(frame, f"{name} ({conf*100:.1f}%)",
                         (20, 40),
                         cv2.FONT_HERSHEY_SIMPLEX, 1,

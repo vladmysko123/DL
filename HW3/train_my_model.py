@@ -12,10 +12,8 @@ DATASET = "dataset_cropped"
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # MTCNN for face alignment (optional but improves quality)
     mtcnn = MTCNN(image_size=160, margin=0, device=device)
 
-    # Pretrained FaceNet model → outputs embeddings
     model = InceptionResnetV1(pretrained='vggface2').eval().to(device)
 
     embeddings = []
@@ -35,7 +33,6 @@ def main():
             path = os.path.join(person_folder, file)
             img = cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
 
-            # Use MTCNN to detect & align face
             face = mtcnn(img)
             if face is None:
                 print("No face:", path)

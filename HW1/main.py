@@ -1,12 +1,3 @@
-# ===== optional sklearn shim if you use sklearn>=1.4 with older PyCaret =====
-# from contextlib import contextmanager
-# import sklearn.utils  # type: ignore
-# @contextmanager
-# def _noop_timer(*args, **kwargs): yield
-# if not hasattr(sklearn.utils, "_print_elapsed_time"):
-#     sklearn.utils._print_elapsed_time = _noop_timer  # type: ignore[attr-defined]
-# =============================================================================
-
 import os, json
 from pathlib import Path
 import joblib

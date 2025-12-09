@@ -5,14 +5,12 @@ import shutil
 INPUT_DIR = "dataset"            # your manually created dataset
 OUTPUT_DIR = "dataset_cropped"   # will be generated automatically
 
-# Haar cascade (included with OpenCV)
 CASCADE_PATH = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
 
 
 def main():
     face_cascade = cv2.CascadeClassifier(CASCADE_PATH)
 
-    # Remove old cropped folder if exists
     if os.path.exists(OUTPUT_DIR):
         shutil.rmtree(OUTPUT_DIR)
     os.makedirs(OUTPUT_DIR)
@@ -45,12 +43,10 @@ def main():
                 print("No face detected:", img_path)
                 continue
 
-            # take the biggest detected face (in case multiple)
             x, y, w, h = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)[0]
 
-            # crop & resize
             face_crop = img[y:y+h, x:x+w]
-            face_crop = cv2.resize(face_crop, (160, 160))  # suitable for DeepFace models
+            face_crop = cv2.resize(face_crop, (160, 160)) 
 
             out_name = f"{len(os.listdir(output_person_folder)):03d}.jpg"
             out_path = os.path.join(output_person_folder, out_name)

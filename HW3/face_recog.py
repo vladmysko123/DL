@@ -3,7 +3,7 @@ import face_recognition
 import numpy as np
 from encode_faces_helper import load_known_faces
 
-THRESHOLD = 0.6  # smaller = stricter match threshold
+THRESHOLD = 0.6 
 
 def distance_to_confidence(distance, threshold=THRESHOLD):
     """
@@ -28,27 +28,23 @@ def main():
             print("Failed to capture frame from camera")
             break
 
-        # Resize to speed up detection
         small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
         rgb_small_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
 
-        # Detect all faces
         face_locations = face_recognition.face_locations(rgb_small_frame)
         face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
 
         for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
-            # Upscale rectangle to original frame size
             top *= 4
             right *= 4
             bottom *= 4
             left *= 4
 
             name = "Unknown"
-            color = (0, 0, 255)  # default: red
+            color = (0, 0, 255)  
             probability_text = "0%"
 
             if len(known_face_encodings) > 0:
-                # Compare against database
                 distances = face_recognition.face_distance(known_face_encodings, face_encoding)
                 best_idx = np.argmin(distances)
                 best_dist = distances[best_idx]
@@ -57,16 +53,13 @@ def main():
                 probability_text = f"{confidence * 100:.1f}%"
 
                 if best_dist < THRESHOLD:
-                    color = (0, 255, 0)  # green
+                    color = (0, 255, 0) 
                     name = known_face_names[best_idx]
 
-            # Draw rectangle around face
             cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
 
-            # Label background
             cv2.rectangle(frame, (left, bottom - 35), (right, bottom), color, cv2.FILLED)
 
-            # Label text
             label = f"{name} ({probability_text})"
             cv2.putText(frame, label, (left + 6, bottom - 6),
                         cv2.FONT_HERSHEY_DUPLEX, 0.6, (255, 255, 255), 1)
