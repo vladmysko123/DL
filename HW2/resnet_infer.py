@@ -9,7 +9,6 @@ from PIL import Image
 import pandas as pd
 
 
-# ---------- Custom dataset for test ----------
 class ButterflyTestDataset(Dataset):
     def __init__(self, df, root_dir: Path, path_col: str, id_col: str, transform=None):
         self.df = df.reset_index(drop=True)
@@ -28,15 +27,14 @@ class ButterflyTestDataset(Dataset):
         img = Image.open(img_path).convert("RGB")
         if self.transform:
             img = self.transform(img)
-        img_id = row[self.id_col]  # just the id (int or str)
+        img_id = row[self.id_col]  
         return img, img_id
 
 
 def main():
-    # ---------- Config ----------
-    DATA_DIR = Path("lnu-butterflies")  # CHANGE if needed
+    DATA_DIR = Path("lnu-butterflies") 
     CLASSES_TXT = DATA_DIR / "classes.txt"
-    BEST_MODEL_PATH = Path("models/alexnet_butterflies_best.pth")  # <- your ResNet checkpoint
+    BEST_MODEL_PATH = Path("models/alexnet_butterflies_best.pth") 
     SAMPLE_SUB = DATA_DIR / "sample_submission.csv"
     TEST_CSV = DATA_DIR / "test.csv"
 
@@ -44,24 +42,19 @@ def main():
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
     print("Using device:", DEVICE)
 
-    # ---------- Classes (for mapping index -> class name) ----------
     classes = [line.strip() for line in CLASSES_TXT.read_text().splitlines() if line.strip()]
     num_classes = len(classes)
     print("Loaded", num_classes, "classes from classes.txt")
 
-    # ---------- Test dataframe ----------
     test_df = pd.read_csv(TEST_CSV)
     print("test_df columns:", test_df.columns.tolist())
 
-    # Adjust if your columns are named differently:
-    ID_COL = "id"      # column with image id
-    PATH_COL = "path"  # column with relative image path
+    ID_COL = "id"     
+    PATH_COL = "path"  
 
-    # If PATH_COL is not present, assume files are test/<id>.jpg
     if PATH_COL not in test_df.columns:
         test_df[PATH_COL] = test_df[ID_COL].astype(str).apply(lambda x: f"test/{x}.jpg")
 
-    # ---------- Transforms ----------
     test_transform = transforms.Compose([
         transforms.Resize(256),
         transforms.CenterCrop(224),
@@ -72,7 +65,6 @@ def main():
         ),
     ])
 
-    # ---------- Dataset & DataLoader ----------
     test_dataset = ButterflyTestDataset(
         test_df, DATA_DIR, PATH_COL, ID_COL, transform=test_transform
     )
@@ -84,8 +76,6 @@ def main():
         pin_memory=True if DEVICE == "cuda" else False,
     )
 
-    # ---------- Build ResNet-18 & load weights ----------
-    # Build the same architecture as in training, but without pretrained weights
     model = resnet18(weights=None)
     in_features = model.fc.in_features
     model.fc = nn.Linear(in_features, num_classes)
@@ -95,7 +85,6 @@ def main():
     model = model.to(DEVICE)
     model.eval()
 
-    # ---------- Inference ----------
     all_ids = []
     all_preds = []
 
@@ -114,11 +103,9 @@ def main():
                 all_ids.append(img_id)
                 all_preds.append(cls_name)
 
-    # ---------- Build submission ----------
     sample_sub = pd.read_csv(SAMPLE_SUB)
     print("sample_submission columns:", sample_sub.columns.tolist())
 
-    # assume first col is id, second is label
     sub_id_col = sample_sub.columns[0]
     sub_label_col = sample_sub.columns[1]
 

@@ -15,7 +15,6 @@ from torchvision.models import resnet18, ResNet18_Weights
 import mlflow
 import mlflow.pytorch
 
-# ---------- Config ----------
 DATA_DIR = Path("lnu-butterflies")
 TRAIN_DIR = DATA_DIR / "train"
 
@@ -30,26 +29,22 @@ RANDOM_SEED = 42
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 print("Using device:", DEVICE)
 
-# Output
 OUT_DIR = Path("models")
 OUT_DIR.mkdir(exist_ok=True)
 BEST_MODEL_PATH = OUT_DIR / "resnet18_butterflies_best.pth"
 best_val_acc = 0.0
 
-# ---------- MLflow ----------
-MLFLOW_TRACKING_URI = "file:D:/dl/hw2/mlruns"   # CHANGE if needed
+MLFLOW_TRACKING_URI = "file:D:/dl/hw2/mlruns"  
 EXPERIMENT_NAME = "resnet18-butterflies"
 
 mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
 mlflow.set_experiment(EXPERIMENT_NAME)
 
-# ---------- Reproducibility ----------
 random.seed(RANDOM_SEED)
 torch.manual_seed(RANDOM_SEED)
 if torch.cuda.is_available():
     torch.cuda.manual_seed_all(RANDOM_SEED)
 
-# ---------- Transforms ----------
 train_transform = transforms.Compose([
     transforms.Resize(256),
     transforms.RandomResizedCrop(224),
@@ -71,7 +66,6 @@ val_transform = transforms.Compose([
     ),
 ])
 
-# ---------- Dataset ----------
 full_dataset = datasets.ImageFolder(TRAIN_DIR, transform=train_transform)
 num_classes = len(full_dataset.classes)
 print("Classes:", full_dataset.classes)
@@ -104,7 +98,6 @@ val_loader = DataLoader(
     num_workers=0
 )
 
-# ---------- Model ----------
 try:
     weights = ResNet18_Weights.IMAGENET1K_V1
     model = resnet18(weights=weights)
@@ -124,7 +117,6 @@ optimizer = optim.SGD(
 )
 scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
 
-# ---------- Training helpers ----------
 def train_one_epoch(epoch):
     model.train()
     running_loss, running_corrects, total = 0.0, 0, 0
@@ -174,7 +166,6 @@ def eval_one_epoch(epoch):
     return loss, acc
 
 
-# ---------- Train ----------
 if __name__ == "__main__":
     with mlflow.start_run():
 

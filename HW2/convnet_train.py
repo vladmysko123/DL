@@ -14,19 +14,16 @@ from timm.scheduler.cosine_lr import CosineLRScheduler
 import mlflow
 import mlflow.pytorch
 
-# -------------------------------------------------
-# Config
-# -------------------------------------------------
 DATA_DIR = Path("lnu-butterflies")
 TRAIN_DIR = DATA_DIR / "train"
 
-BATCH_SIZE = 8                 # Safe for RTX 3050 (4GB)
+BATCH_SIZE = 8                 
 NUM_EPOCHS = 10
 VAL_SPLIT = 0.1
 RANDOM_SEED = 42
 
-IMG_SIZE = 192                 # HUGE speedup vs 224
-BASE_LR = 5e-4                 # Higher LR for head-only training
+IMG_SIZE = 192                
+BASE_LR = 5e-4               
 MIN_LR = 1e-6
 WEIGHT_DECAY = 0.01
 WARMUP_EPOCHS = 1
@@ -46,9 +43,6 @@ EXPERIMENT_NAME = "convnext-base-fast"
 mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
 mlflow.set_experiment(EXPERIMENT_NAME)
 
-# -------------------------------------------------
-# Repro
-# -------------------------------------------------
 random.seed(RANDOM_SEED)
 torch.manual_seed(RANDOM_SEED)
 if torch.cuda.is_available():
@@ -59,9 +53,6 @@ torch.backends.cudnn.benchmark = True
 USE_AUTOCast = DEVICE == "cuda"
 AUTOCAST_KW = dict(device_type="cuda", dtype=torch.bfloat16)
 
-# -------------------------------------------------
-# Transforms (192x192)
-# -------------------------------------------------
 train_transform = transforms.Compose([
     transforms.Resize(256),
     transforms.RandomResizedCrop(IMG_SIZE),
@@ -84,9 +75,6 @@ val_transform = transforms.Compose([
     ),
 ])
 
-# -------------------------------------------------
-# Dataset
-# -------------------------------------------------
 base_dataset = datasets.ImageFolder(TRAIN_DIR)
 num_classes = len(base_dataset.classes)
 print("Classes:", base_dataset.classes)
@@ -119,7 +107,7 @@ class TransformDataset(torch.utils.data.Dataset):
 train_dataset = TransformDataset(train_subset, train_transform)
 val_dataset = TransformDataset(val_subset, val_transform)
 
-NUM_WORKERS = 2   # Faster on Windows laptops
+NUM_WORKERS = 2   
 
 train_loader = DataLoader(
     train_dataset,
@@ -139,9 +127,6 @@ val_loader = DataLoader(
     persistent_workers=True,
 )
 
-# -------------------------------------------------
-# Model (ConvNeXt-Base, FROZEN)
-# -------------------------------------------------
 model_name = "convnext_base"
 
 model = timm.create_model(
@@ -150,7 +135,6 @@ model = timm.create_model(
     pretrained=True,
 )
 
-# 🔥 Freeze backbone (CRITICAL)
 for name, param in model.named_parameters():
     if "head" not in name:
         param.requires_grad = False
@@ -158,9 +142,6 @@ for name, param in model.named_parameters():
 model = model.to(DEVICE, memory_format=torch.channels_last)
 print("Model:", model_name, "| Backbone frozen")
 
-# -------------------------------------------------
-# Loss, Optimizer, Scheduler
-# -------------------------------------------------
 criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
 
 optimizer = create_optimizer_v2(
@@ -179,9 +160,6 @@ scheduler = CosineLRScheduler(
     t_in_epochs=True,
 )
 
-# -------------------------------------------------
-# Train / Eval
-# -------------------------------------------------
 def train_one_epoch(epoch):
     model.train()
     loss_sum, correct, total = 0.0, 0, 0
@@ -233,10 +211,6 @@ def eval_one_epoch(epoch):
     print(f"[Val]   Epoch {epoch+1}: Loss={loss:.4f} Acc={acc:.4f}")
     return loss, acc
 
-
-# -------------------------------------------------
-# Main
-# -------------------------------------------------
 if __name__ == "__main__":
     with mlflow.start_run():
 

@@ -45,7 +45,6 @@ def main():
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
     print("Using device:", DEVICE)
 
-    # ---------- Classes (for mapping index -> class name) ----------
     classes = [line.strip() for line in CLASSES_TXT.read_text().splitlines() if line.strip()]
     num_classes = len(classes)
     print("Loaded", num_classes, "classes from classes.txt")
@@ -76,7 +75,7 @@ def main():
         test_dataset,
         batch_size=BATCH_SIZE,
         shuffle=False,
-        num_workers=0,  # simpler & safe on Windows
+        num_workers=0, 
         pin_memory=True if DEVICE == "cuda" else False,
     )
 
@@ -87,7 +86,7 @@ def main():
 
     model = timm.create_model(
         model_name,
-        pretrained=False,      # we're loading our own weights
+        pretrained=False,      
         num_classes=num_classes,
     )
 
@@ -95,7 +94,6 @@ def main():
     model = model.to(DEVICE)
     model.eval()
 
-    # ---------- Inference ----------
     all_ids = []
     all_preds = []
 
@@ -107,20 +105,16 @@ def main():
             _, pred_idx = torch.max(outputs, 1)
             pred_idx = pred_idx.cpu().numpy()
 
-            # ids is either a list of strings or a tensor of ints
             for i, img_id in enumerate(ids):
                 if not isinstance(img_id, str):
-                    # likely a tensor scalar
                     img_id = img_id.item()
                 cls = classes[pred_idx[i]]
                 all_ids.append(img_id)
                 all_preds.append(cls)
 
-    # ---------- Build submission ----------
     sample_sub = pd.read_csv(SAMPLE_SUB)
     print("sample_submission columns:", sample_sub.columns.tolist())
 
-    # assume first col is id, second is label column
     sub_id_col = sample_sub.columns[0]
     sub_label_col = sample_sub.columns[1]
 
