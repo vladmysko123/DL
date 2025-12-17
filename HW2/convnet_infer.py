@@ -9,7 +9,6 @@ import pandas as pd
 import timm
 
 
-# ---------- Custom dataset for test ----------
 class ButterflyTestDataset(Dataset):
     def __init__(self, df, root_dir: Path, path_col: str, id_col: str, transform=None):
         self.df = df.reset_index(drop=True)
@@ -28,17 +27,15 @@ class ButterflyTestDataset(Dataset):
         img = Image.open(img_path).convert("RGB")
         if self.transform:
             img = self.transform(img)
-        img_id = row[self.id_col]  # just the id (int or str)
+        img_id = row[self.id_col] 
         return img, img_id
 
 
 def main():
-    # ---------- Config ----------
-    DATA_DIR = Path("lnu-butterflies")  # CHANGE if needed
+    DATA_DIR = Path("lnu-butterflies") 
     TEST_DIR = DATA_DIR / "test"
     CLASSES_TXT = DATA_DIR / "classes.txt"
 
-    # path to your trained ConvNeXt checkpoint:
     BEST_MODEL_PATH = Path("models/convnext_base1_butterflies_best.pth")
 
     SAMPLE_SUB = DATA_DIR / "sample_submission.csv"
@@ -53,19 +50,15 @@ def main():
     num_classes = len(classes)
     print("Loaded", num_classes, "classes from classes.txt")
 
-    # ---------- Test dataframe ----------
     test_df = pd.read_csv(TEST_CSV)
     print("test_df columns:", test_df.columns.tolist())
 
-    # Guess column names – adjust here if different:
-    ID_COL = "id"      # CHANGE if your id column has another name
-    PATH_COL = "path"  # CHANGE if test.csv actually stores relative paths
+    ID_COL = "id"     
+    PATH_COL = "path" 
 
     if PATH_COL not in test_df.columns:
-        # if test.csv only has id and files are `test/<id>.jpg`
         test_df[PATH_COL] = test_df[ID_COL].astype(str).apply(lambda x: f"test/{x}.jpg")
 
-    # ---------- Transforms (match training val transforms) ----------
     test_transform = transforms.Compose([
         transforms.Resize(256),
         transforms.CenterCrop(224),
@@ -76,7 +69,6 @@ def main():
         ),
     ])
 
-    # ---------- Dataset & DataLoader ----------
     test_dataset = ButterflyTestDataset(
         test_df, DATA_DIR, PATH_COL, ID_COL, transform=test_transform
     )
@@ -88,12 +80,8 @@ def main():
         pin_memory=True if DEVICE == "cuda" else False,
     )
 
-    # ---------- Build ConvNeXt & load weights ----------
-    # We just recreate the architecture and load your fine-tuned weights.
-    # No need for pretrained=True here because checkpoint already has trained weights.
     checkpoint = torch.load(BEST_MODEL_PATH, map_location=DEVICE)
 
-    # Try to get model name from checkpoint if you saved it, otherwise default to convnext_base
     model_name = checkpoint.get("model_name", "convnext_base")
     print(f"Using model_name from checkpoint: {model_name}")
 

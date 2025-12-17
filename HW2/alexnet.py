@@ -1,5 +1,6 @@
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
 from pathlib import Path
 import random
 import time
@@ -10,27 +11,36 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, random_split, Subset
 from torchvision import datasets, transforms, models
 
+import mlflow
+import mlflow.pytorch
+
 # ---------- Config ----------
-DATA_DIR = Path("lnu-butterflies")   # CHANGE if needed
+DATA_DIR = Path("lnu-butterflies")
 TRAIN_DIR = DATA_DIR / "train"
-CLASSES_TXT = DATA_DIR / "classes.txt"
 
 BATCH_SIZE = 64
 NUM_EPOCHS = 20
 LR = 1e-3
 MOMENTUM = 0.9
 WEIGHT_DECAY = 5e-4
-VAL_SPLIT = 0.1  # 10% of train as validation
+VAL_SPLIT = 0.1
 RANDOM_SEED = 42
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 print("Using device:", DEVICE)
 
-# Where to save the best model
+# Output
 OUT_DIR = Path("models")
 OUT_DIR.mkdir(exist_ok=True)
 BEST_MODEL_PATH = OUT_DIR / "alexnet_butterflies_best.pth"
 best_val_acc = 0.0
+
+# ---------- MLflow ----------
+MLFLOW_TRACKING_URI = "file:D:/dl/hw2/mlruns"   # CHANGE if needed
+EXPERIMENT_NAME = "alexnet-butterflies"
+
+mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+mlflow.set_experiment(EXPERIMENT_NAME)
 
 # ---------- Reproducibility ----------
 random.seed(RANDOM_SEED)
@@ -39,7 +49,6 @@ if torch.cuda.is_available():
     torch.cuda.manual_seed_all(RANDOM_SEED)
 
 # ---------- Transforms ----------
-# Dataset says images are 224x224, but we still do Resize/Crop for safety & augmentation
 train_transform = transforms.Compose([
     transforms.Resize(256),
     transforms.RandomResizedCrop(224),
@@ -61,28 +70,26 @@ val_transform = transforms.Compose([
     ),
 ])
 
-# ---------- Dataset & split ----------
+# ---------- Dataset ----------
 full_dataset = datasets.ImageFolder(TRAIN_DIR, transform=train_transform)
 num_classes = len(full_dataset.classes)
-print("Found classes in train folder:", full_dataset.classes)
-print("num_classes:", num_classes)
+print("Classes:", full_dataset.classes)
 
 n_total = len(full_dataset)
 n_val = int(n_total * VAL_SPLIT)
 n_train = n_total - n_val
-train_dataset, val_dataset = random_split(
+
+train_dataset, val_split = random_split(
     full_dataset,
     [n_train, n_val],
     generator=torch.Generator().manual_seed(RANDOM_SEED),
 )
 
-# apply val_transform to validation subset (wrap with Subset)
 val_dataset = Subset(
     datasets.ImageFolder(TRAIN_DIR, transform=val_transform),
-    val_dataset.indices
+    val_split.indices
 )
 
-# DataLoaders — num_workers=0 so Windows multiprocessing won't complain
 train_loader = DataLoader(
     train_dataset, batch_size=BATCH_SIZE,
     shuffle=True, num_workers=0
@@ -92,17 +99,15 @@ val_loader = DataLoader(
     shuffle=False, num_workers=0
 )
 
-# ---------- AlexNet model ----------
+# ---------- Model ----------
 try:
     from torchvision.models import AlexNet_Weights
-    weights = AlexNet_Weights.IMAGENET1K_V1
-    model = models.alexnet(weights=weights)
+    model = models.alexnet(weights=AlexNet_Weights.IMAGENET1K_V1)
 except Exception:
     model = models.alexnet(pretrained=True)
 
 in_features = model.classifier[6].in_features
 model.classifier[6] = nn.Linear(in_features, num_classes)
-
 model = model.to(DEVICE)
 
 criterion = nn.CrossEntropyLoss()
@@ -115,17 +120,14 @@ optimizer = optim.SGD(
 scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
 
 # ---------- Training helpers ----------
-def train_one_epoch(epoch: int):
+def train_one_epoch(epoch):
     model.train()
-    running_loss = 0.0
-    running_corrects = 0
-    total = 0
-
-    start_time = time.time()
+    running_loss, running_corrects, total = 0.0, 0, 0
+    start = time.time()
 
     for images, labels in train_loader:
-        images = images.to(DEVICE, non_blocking=True)
-        labels = labels.to(DEVICE, non_blocking=True)
+        images = images.to(DEVICE)
+        labels = labels.to(DEVICE)
 
         optimizer.zero_grad()
         outputs = model(images)
@@ -138,26 +140,20 @@ def train_one_epoch(epoch: int):
         running_corrects += torch.sum(preds == labels).item()
         total += images.size(0)
 
-    epoch_loss = running_loss / total
-    epoch_acc = running_corrects / total
-    elapsed = time.time() - start_time
-
-    print(f"[Train] Epoch {epoch+1}: "
-          f"Loss={epoch_loss:.4f} Acc={epoch_acc:.4f} Time={elapsed:.1f}s")
-
-    return epoch_loss, epoch_acc
+    loss = running_loss / total
+    acc = running_corrects / total
+    print(f"[Train] Epoch {epoch+1}: Loss={loss:.4f} Acc={acc:.4f} Time={time.time()-start:.1f}s")
+    return loss, acc
 
 
-def eval_one_epoch(epoch: int):
+def eval_one_epoch(epoch):
     model.eval()
-    running_loss = 0.0
-    running_corrects = 0
-    total = 0
+    running_loss, running_corrects, total = 0.0, 0, 0
 
     with torch.no_grad():
         for images, labels in val_loader:
-            images = images.to(DEVICE, non_blocking=True)
-            labels = labels.to(DEVICE, non_blocking=True)
+            images = images.to(DEVICE)
+            labels = labels.to(DEVICE)
 
             outputs = model(images)
             loss = criterion(outputs, labels)
@@ -167,27 +163,54 @@ def eval_one_epoch(epoch: int):
             running_corrects += torch.sum(preds == labels).item()
             total += images.size(0)
 
-    epoch_loss = running_loss / total
-    epoch_acc = running_corrects / total
-    print(f"[Val]   Epoch {epoch+1}: Loss={epoch_loss:.4f} Acc={epoch_acc:.4f}")
+    loss = running_loss / total
+    acc = running_corrects / total
+    print(f"[Val]   Epoch {epoch+1}: Loss={loss:.4f} Acc={acc:.4f}")
+    return loss, acc
 
-    return epoch_loss, epoch_acc
 
-
-# ---------- Train loop ----------
+# ---------- Train ----------
 if __name__ == "__main__":
-    for epoch in range(NUM_EPOCHS):
-        train_loss, train_acc = train_one_epoch(epoch)
-        val_loss, val_acc = eval_one_epoch(epoch)
-        scheduler.step()
+    with mlflow.start_run():
 
-        if val_acc > best_val_acc:
-            best_val_acc = val_acc
-            torch.save({
-                "model_state_dict": model.state_dict(),
-                "class_to_idx": full_dataset.class_to_idx,
-            }, BEST_MODEL_PATH)
-            print(f"✓ New best model saved (val_acc={best_val_acc:.4f})")
+        mlflow.log_params({
+            "model": "alexnet",
+            "batch_size": BATCH_SIZE,
+            "epochs": NUM_EPOCHS,
+            "learning_rate": LR,
+            "momentum": MOMENTUM,
+            "weight_decay": WEIGHT_DECAY,
+            "val_split": VAL_SPLIT,
+            "num_classes": num_classes,
+            "optimizer": "SGD",
+            "scheduler": "StepLR",
+        })
 
-    print("Training finished. Best val_acc:", best_val_acc)
-    print("Best model saved to:", BEST_MODEL_PATH)
+        for epoch in range(NUM_EPOCHS):
+            train_loss, train_acc = train_one_epoch(epoch)
+            val_loss, val_acc = eval_one_epoch(epoch)
+            scheduler.step()
+
+            mlflow.log_metrics({
+                "train_loss": train_loss,
+                "train_acc": train_acc,
+                "val_loss": val_loss,
+                "val_acc": val_acc,
+            }, step=epoch)
+
+            if val_acc > best_val_acc:
+                best_val_acc = val_acc
+                torch.save({
+                    "model_state_dict": model.state_dict(),
+                    "class_to_idx": full_dataset.class_to_idx,
+                }, BEST_MODEL_PATH)
+
+                mlflow.log_artifact(str(BEST_MODEL_PATH))
+                mlflow.log_metric("best_val_acc", best_val_acc)
+                print(f"✓ New best model saved (val_acc={best_val_acc:.4f})")
+
+        mlflow.pytorch.log_model(model, artifact_path="model")
+
+        print("Training finished")
+        print("Best val_acc:", best_val_acc)
+        print("Model saved to:", BEST_MODEL_PATH)
